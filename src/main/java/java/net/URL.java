@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
  *
  *
@@ -213,7 +213,7 @@ public final class URL implements java.io.Serializable {
      * The host's IP address, used in equals and hashCode.
      * Computed on demand. An uninitialized or unknown hostAddress is null.
      */
-    transient InetAddress hostAddress;
+    private transient InetAddress hostAddress;
 
     /**
      * The URLStreamHandler for this URL.
@@ -741,6 +741,31 @@ public final class URL implements java.io.Serializable {
             this.authority = authority;
         }
     }
+
+    /**
+     * Returns the address of the host represented by this URL.
+     * A {@link SecurityException} or an {@link UnknownHostException}
+     * while getting the host address will result in this method returning
+     * {@code null}
+     *
+     * @return an {@link InetAddress} representing the host
+     */
+    synchronized InetAddress getHostAddress() {
+        if (hostAddress != null) {
+            return hostAddress;
+        }
+
+        if (host == null || host.isEmpty()) {
+            return null;
+        }
+        try {
+            hostAddress = InetAddress.getByName(host);
+        } catch (UnknownHostException | SecurityException ex) {
+            return null;
+        }
+        return hostAddress;
+    }
+
 
     /**
      * Gets the query part of this {@code URL}.
@@ -1308,7 +1333,7 @@ public final class URL implements java.io.Serializable {
         String ref = (String)gf.get("ref", null);
         int hashCode = gf.get("hashCode", -1);
         if (authority == null
-                && ((host != null && host.length() > 0) || port != -1)) {
+                && ((host != null && !host.isEmpty()) || port != -1)) {
             if (host == null)
                 host = "";
             authority = (port == -1) ? host : host + ":" + port;
@@ -1355,7 +1380,7 @@ public final class URL implements java.io.Serializable {
 
         // Construct authority part
         if (authority == null
-            && ((host != null && host.length() > 0) || port != -1)) {
+            && ((host != null && !host.isEmpty()) || port != -1)) {
             if (host == null)
                 host = "";
             authority = (port == -1) ? host : host + ":" + port;
@@ -1535,7 +1560,7 @@ final class UrlDeserializedState {
 
         // pre-compute length of StringBuilder
         int len = protocol.length() + 1;
-        if (authority != null && authority.length() > 0)
+        if (authority != null && !authority.isEmpty())
             len += 2 + authority.length();
         if (file != null) {
             len += file.length();
@@ -1545,7 +1570,7 @@ final class UrlDeserializedState {
         StringBuilder result = new StringBuilder(len);
         result.append(protocol);
         result.append(":");
-        if (authority != null && authority.length() > 0) {
+        if (authority != null && !authority.isEmpty()) {
             result.append("//");
             result.append(authority);
         }

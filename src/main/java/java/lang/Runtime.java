@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2013, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2020, Oracle and/or its affiliates. All rights reserved.
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
  *
  *
@@ -272,6 +272,7 @@ public class Runtime {
         if (sm != null) {
             sm.checkExit(status);
         }
+        Shutdown.beforeHalt();
         Shutdown.halt(status);
     }
 
@@ -440,7 +441,7 @@ public class Runtime {
      */
     public Process exec(String command, String[] envp, File dir)
         throws IOException {
-        if (command.length() == 0)
+        if (command.isEmpty())
             throw new IllegalArgumentException("Empty command");
 
         StringTokenizer st = new StringTokenizer(command);

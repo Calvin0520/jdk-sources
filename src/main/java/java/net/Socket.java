@@ -143,7 +143,7 @@ class Socket implements java.io.Closeable {
         } else {
             if (p == Proxy.NO_PROXY) {
                 if (factory == null) {
-                    impl = new PlainSocketImpl();
+                    impl = new PlainSocketImpl(false);
                     impl.setSocket(this);
                 } else
                     setImpl();

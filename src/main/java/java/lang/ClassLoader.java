@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
  *
  *
@@ -859,7 +859,7 @@ public abstract class ClassLoader {
 
     // true if the name is null or has the potential to be a valid binary name
     private boolean checkName(String name) {
-        if ((name == null) || (name.length() == 0))
+        if ((name == null) || (name.isEmpty()))
             return true;
         if ((name.indexOf('/') != -1)
             || (!VM.allowArraySyntax() && (name.charAt(0) == '[')))
@@ -1716,7 +1716,10 @@ public abstract class ClassLoader {
         boolean isBuiltin;
         // Indicates if the native library is loaded
         boolean loaded;
-        native void load(String name, boolean isBuiltin);
+
+        private static final boolean loadLibraryOnlyIfPresent = ClassLoaderHelper.loadLibraryOnlyIfPresent();
+
+        native void load(String name, boolean isBuiltin, boolean throwExceptionIfFail);
 
         native long find(String name);
         native void unload(String name, boolean isBuiltin);
@@ -1873,7 +1876,7 @@ public abstract class ClassLoader {
                         return file.exists() ? Boolean.TRUE : null;
                     }})
                 != null;
-            if (!exists) {
+            if (NativeLibrary.loadLibraryOnlyIfPresent && !exists) {
                 return false;
             }
             try {
@@ -1931,7 +1934,7 @@ public abstract class ClassLoader {
                 NativeLibrary lib = new NativeLibrary(fromClass, name, isBuiltin);
                 nativeLibraryContext.push(lib);
                 try {
-                    lib.load(name, isBuiltin);
+                    lib.load(name, isBuiltin, NativeLibrary.loadLibraryOnlyIfPresent);
                 } finally {
                     nativeLibraryContext.pop();
                 }

@@ -36,6 +36,8 @@ import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.LockSupport;
+
+import jdk.internal.misc.TerminatingThreadLocal;
 import sun.nio.ch.Interruptible;
 import sun.reflect.CallerSensitive;
 import sun.reflect.Reflection;
@@ -139,13 +141,23 @@ import sun.security.util.SecurityConstants;
  */
 public
 class Thread implements Runnable {
+
     /* Make sure registerNatives is the first thing <clinit> does. */
+    /**
+     * 类加载的时候，调用本地的注册本地静态方法
+     */
     private static native void registerNatives();
     static {
         registerNatives();
     }
 
+    /**
+     * 线程名称
+     */
     private volatile String name;
+    /**
+     * 优先级
+     */
     private int            priority;
     private Thread         threadQ;
     private long           eetop;
@@ -154,36 +166,65 @@ class Thread implements Runnable {
     private boolean     single_step;
 
     /* Whether or not the thread is a daemon thread. */
+    /**
+     * 是否是守护线程，true 是守护线程。如果是守护线程的话，是不能够阻止 JVM 的退出的，级别很低
+     */
     private boolean     daemon = false;
 
     /* JVM state */
+    /**
+     * JVM 状态
+     */
     private boolean     stillborn = false;
 
     /* What will be run. */
+    /**
+     * 实际被执行的对象
+     */
     private Runnable target;
 
     /* The group of this thread */
+    /**
+     * 该线程的线程组
+     */
     private ThreadGroup group;
 
     /* The context ClassLoader for this thread */
+    /**
+     * 该线程的上下文类加载器
+     */
     private ClassLoader contextClassLoader;
 
     /* The inherited AccessControlContext of this thread */
     private AccessControlContext inheritedAccessControlContext;
 
     /* For autonumbering anonymous threads. */
+    /**
+     * 给线程自动生成名称所用
+     */
     private static int threadInitNumber;
+    /**
+     * 同一时刻只会有一个线程修改 threadInitNumber 的值，线程安全
+     *
+     * @return
+     */
     private static synchronized int nextThreadNum() {
         return threadInitNumber++;
     }
 
     /* ThreadLocal values pertaining to this thread. This map is maintained
      * by the ThreadLocal class. */
+    /**
+     * ThreadLocal 的 ThreadLocalMap 是线程的一个属性，所以在多线程环境下 threadLocals 是线程安全的
+     */
     ThreadLocal.ThreadLocalMap threadLocals = null;
 
     /*
      * InheritableThreadLocal values pertaining to this thread. This map is
      * maintained by the InheritableThreadLocal class.
+     */
+    /**
+     * 当创建子线程时，子线程可以得到父线程的 inheritableThreadLocals
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
@@ -191,6 +232,9 @@ class Thread implements Runnable {
      * The requested stack size for this thread, or 0 if the creator did
      * not specify a stack size.  It is up to the VM to do whatever it
      * likes with this number; some VMs will ignore it.
+     */
+    /**
+     * 此线程请求的堆栈大小
      */
     private long stackSize;
 
@@ -202,18 +246,30 @@ class Thread implements Runnable {
     /*
      * Thread ID
      */
+    /**
+     * 线程 ID
+     */
     private long tid;
 
     /* For generating thread ID */
+    /**
+     * 用于生成线程 ID
+     */
     private static long threadSeqNumber;
 
     /* Java thread status for tools,
      * initialized to indicate thread 'not yet started'
      */
-
+    /**
+     * 线程状态
+     */
     private volatile int threadStatus = 0;
 
-
+    /**
+     * 同一时刻只会有一个线程修改 threadSeqNumber 的值，线程安全
+     *
+     * @return
+     */
     private static synchronized long nextThreadID() {
         return ++threadSeqNumber;
     }
@@ -224,11 +280,19 @@ class Thread implements Runnable {
      * Set by (private) java.util.concurrent.locks.LockSupport.setBlocker
      * Accessed using java.util.concurrent.locks.LockSupport.getBlocker
      */
+    /**
+     * 此对象不为null时说明线程进入了park（阻塞）状态，参见 LockSupport
+     *
+     * @see java.util.concurrent.locks.LockSupport
+     */
     volatile Object parkBlocker;
 
     /* The object in which this thread is blocked in an interruptible I/O
      * operation, if any.  The blocker's interrupt method should be invoked
      * after setting this thread's interrupt status.
+     */
+    /**
+     * 线程中断回调标记，设置此标记后，可在线程被中断时调用标记对象的回调方法
      */
     private volatile Interruptible blocker;
     private final Object blockerLock = new Object();
@@ -754,6 +818,9 @@ class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
+        if (threadLocals != null && TerminatingThreadLocal.REGISTRY.isPresent()) {
+            TerminatingThreadLocal.threadTerminated();
+        }
         if (group != null) {
             group.threadTerminated(this);
             group = null;
@@ -910,6 +977,25 @@ class Thread implements Runnable {
      *
      * @revised 6.0
      * @spec JSR-51
+     */
+
+    /**
+     * 中断此线程。
+     *
+     * <p> 除非当前线程中断自身（这是始终允许的），否则将调用此线程的{@link #checkAccess() checkAccess}方法，这可能会导致引发{@link SecurityException}。<p/>
+     * <p> 如果该线程在调用对象类的wait()、wait(long)或wait(long，int)方法时被阻塞，
+     *  或者在调用该类的join()、join(long)、join(long，int)、sleep(long)或sleep(long，int)方法时被阻塞，
+     *  那么它的中断状态将被清除，并将接收到{@link InterruptedException}。<p/>
+     * <p> 如果该线程在中断通道上的I/O操作中被阻塞，那么该通道将被关闭，线程的中断状态将被设置，线程将接收{@link java.nio.channels.ClosedByInterruptException}。<p/>
+     * <p> 如果该线程在 {@link java.nio.channels.Selector} 中被阻塞,然后线程的中断状态将被设置，
+     *  它将立即从选择操作返回，可能带有非零值，就像调用了选择器的唤醒方法一样。<p/>
+     * <p> 如果前面的条件都不成立，那么将设置该线程的中断状态。<p/>
+     * <p> 中断不活动的线程不需要有任何效果。<p/>
+     *
+     * @throws  SecurityException 如果当前线程无法修改此线程
+     * @revised 6.0
+     * @spec JSR-51
+     *
      */
     public void interrupt() {
         if (this != Thread.currentThread())

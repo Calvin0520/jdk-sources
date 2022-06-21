@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2020, Oracle and/or its affiliates. All rights reserved.
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
  *
  *
@@ -1322,7 +1322,7 @@ public final class Pattern
 
         // if length > 0, the Pattern is lazily compiled
         compiled = false;
-        if (pattern.length() == 0) {
+        if (pattern.isEmpty()) {
             root = new Start(lastAccept);
             matchRoot = lastAccept;
             compiled = true;
@@ -1347,7 +1347,7 @@ public final class Pattern
         capturingGroupCount = 1;
         localCount = 0;
 
-        if (pattern.length() > 0) {
+        if (!pattern.isEmpty()) {
             try {
                 compile();
             } catch (StackOverflowError soe) {

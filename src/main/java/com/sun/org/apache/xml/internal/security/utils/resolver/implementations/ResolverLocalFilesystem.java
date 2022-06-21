@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2022, Oracle and/or its affiliates. All rights reserved.
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
  */
 /**
@@ -38,15 +38,8 @@ import com.sun.org.apache.xml.internal.security.utils.resolver.ResourceResolverS
  */
 public class ResolverLocalFilesystem extends ResourceResolverSpi {
 
-    private static final int FILE_URI_LENGTH = "file:/".length();
-
     private static final com.sun.org.slf4j.internal.Logger LOG =
         com.sun.org.slf4j.internal.LoggerFactory.getLogger(ResolverLocalFilesystem.class);
-
-    @Override
-    public boolean engineIsThreadSafe() {
-        return true;
-    }
 
     /**
      * {@inheritDoc}
@@ -58,9 +51,7 @@ public class ResolverLocalFilesystem extends ResourceResolverSpi {
             // calculate new URI
             URI uriNew = getNewURI(context.uriToResolve, context.baseUri);
 
-            String fileName =
-                ResolverLocalFilesystem.translateUriToFilename(uriNew.toString());
-            InputStream inputStream = Files.newInputStream(Paths.get(fileName));
+            InputStream inputStream = Files.newInputStream(Paths.get(uriNew));
             XMLSignatureInput result = new XMLSignatureInput(inputStream);
             result.setSecureValidation(context.secureValidation);
 
@@ -73,41 +64,6 @@ public class ResolverLocalFilesystem extends ResourceResolverSpi {
     }
 
     /**
-     * Method translateUriToFilename
-     *
-     * @param uri
-     * @return the string of the filename
-     */
-    private static String translateUriToFilename(String uri) {
-
-        String subStr = uri.substring(FILE_URI_LENGTH);
-
-        if (subStr.indexOf("%20") > -1) {
-            int offset = 0;
-            int index = 0;
-            StringBuilder temp = new StringBuilder(subStr.length());
-            do {
-                index = subStr.indexOf("%20",offset);
-                if (index == -1) {
-                    temp.append(subStr.substring(offset));
-                } else {
-                    temp.append(subStr.substring(offset, index));
-                    temp.append(' ');
-                    offset = index + 3;
-                }
-            } while(index != -1);
-            subStr = temp.toString();
-        }
-
-        if (subStr.charAt(1) == ':') {
-            // we're running M$ Windows, so this works fine
-            return subStr;
-        }
-        // we're running some UNIX, so we have to prepend a slash
-        return "/" + subStr;
-    }
-
-    /**
      * {@inheritDoc}
      */
     public boolean engineCanResolveURI(ResourceResolverContext context) {
@@ -115,7 +71,7 @@ public class ResolverLocalFilesystem extends ResourceResolverSpi {
             return false;
         }
 
-        if (context.uriToResolve.equals("") || context.uriToResolve.charAt(0) == '#' ||
+        if (context.uriToResolve.isEmpty() || context.uriToResolve.charAt(0) == '#' ||
             context.uriToResolve.startsWith("http:")) {
             return false;
         }
@@ -146,9 +102,7 @@ public class ResolverLocalFilesystem extends ResourceResolverSpi {
 
         // if the URI contains a fragment, ignore it
         if (newUri.getFragment() != null) {
-            URI uriNewNoFrag =
-                new URI(newUri.getScheme(), newUri.getSchemeSpecificPart(), null);
-            return uriNewNoFrag;
+            return new URI(newUri.getScheme(), newUri.getSchemeSpecificPart(), null);
         }
         return newUri;
     }
